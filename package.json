@@ -1,0 +1,32 @@
+{
+  "name": "banchee-rest",
+  "version": "0.0.1",
+  "description": "Generate powerful RESTful JSON APIs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://jpillora@github.com/banchee/rest.git"
+  },
+  "keywords": [
+    "rest",
+    "json",
+    "api",
+    "generate",
+    "server",
+    "monogo",
+    "mongoose"
+  ],
+  "author": "Jaime Pillora",
+  "license": "MIT",
+  "readmeFilename": "README.md",
+  "gitHead": "6bae8330784770cfbe5d7402dd5be76e68baba93",
+  "dependencies": {
+    "express-resource": "~1.0.0",
+    "mongoose": "~3.6.2",
+    "coffee-script": "~1.6.2",
+    "lodash": "~1.1.1"
+  }
+}
