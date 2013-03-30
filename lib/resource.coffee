@@ -14,28 +14,31 @@ unimplemented = (req, res) -> res.status 501
 #define
 class Resource
   
-  defaultConfig:
+  defaults:
     base: null
     schemaOpts:
       strict: true
     middleware: {}
 
   #ENTRY
-  constructor: (@name, @config = {}, @rest) ->
+  constructor: (@name, @opts = {}, @rest) ->
 
     _.bindAll @
 
-    unless _.isPlainObject @config
-      throw "Configuration must be a plain object"
+    unless _.isPlainObject @opts
+      throw "Optsuration must be a plain object"
 
-    unless @config.schema
+    unless @opts.schema
       throw "Resource 'schema' required"
 
-    _.defaults @config, @defaults
+
+    console.log @name, "defaults", @defaults.middleware
+
+    @opts = _.extend {}, @defaults, @opts
 
     @routeName = @name.toLowerCase()
 
-    @checkConfig()
+    @checkOpts()
     @checkSchema()
     @defineSchema()
     @defineSchemaMiddleware()
@@ -43,63 +46,65 @@ class Resource
     console.log @name, "resource ready"
     
   #CONFIG
-  checkConfig: ->
-    if @config.isUser or @routeName is 'user'
-      @rest.hasUser = true
+  checkOpts: ->
+
+
+    console.log @name, @opts.middleware
+
+    if @opts.isUser
       userify @
+      @rest.UserResource = @
+
+    console.log @name, @opts.middleware
 
   #SCHEMA
   checkSchema: ->
 
     #extract children
-    for key, val of @config.schema
+    for key, val of @opts.schema
+
+      if _.isArray(val) and val.length is 1
+        val = val[0]
+        isArray = true
 
       if typeof val is 'string'
         other = @rest.resources[val]
-        if other.Schema
-          @config.schema[key] = other.Schema
-
-      if _.isArray(val) and
-         val.length is 1 and
-         typeof val[0] is 'string'
-
-
-      
-
+        if other and other.Schema
+          console.log "#{@name} found: #{other.name}"
+          @opts.schema[key] = mongoose.Schema.ObjectId
+        else
+          throw "#{@name} could NOT find: #{val}"
 
   defineSchema: ->
 
     #build mongoose schema
-    if typeof @config.extend is 'string'
-      Extend = @rest.resources[@config.extend]
-      @Schema =  Extend.extend @config.schema, @config.schemaOpts
+    if typeof @opts.extend is 'string'
+      Extend = @rest.resources[@opts.extend]
+      @Schema =  Extend.extend @opts.schema, @opts.schemaOpts
     else
-      @Schema = new mongoose.Schema @config.schema, @config.schemaOpts
+      @Schema = new mongoose.Schema @opts.schema, @opts.schemaOpts
     
     #build mongoose model
     @Model = @rest.db.model @name, @Schema
-
-    @Schema.create = (props, done) =>
-      x = new @Model props
-      x.save done
-
+    #back ref
     @Schema.resource = @
 
   defineSchemaMiddleware: ->
     set = (time, type, fn) =>
       if typeof fn is 'function'
         @Schema[time](type, fn)
+        console.log @, "set middleware: #{time} #{type}"
     
-    middleware = @config.middleware
+    middleware = @opts.middleware
 
-    for time of middleware
-      for type of middleware[time]
-        fns = middleware[time][type]
+    for time, types of middleware
+      for type, fns of types
         if typeof fns is 'array'
           for fn in fns
-            setMiddleware time, type, fn
+            set time, type, fn
         else
-          setMiddleware time, type, fns
+          set time, type, fns
+    null
 
   #ROUTES
   defineRoute: ->
@@ -162,6 +167,8 @@ class Resource
     new: (req, res) =>
       @json(res)(null, _.keys(@schema.paths))
 
+  #helpers
+  toString: -> @name + ": "
 
 module.exports = Resource
 

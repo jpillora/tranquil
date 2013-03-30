@@ -4,18 +4,25 @@ db = require "./db"
 _ = require "lodash"
 express = require "express"
 
+guid = -> (Math.random()*Math.pow(2,32)).toString(16)
+
 class Rest
 
   defaults:
+    url: ''
+    admin:
+      username: "admin"
+      password: guid()+guid()
     database:
-      name: "banchee-rest"
+      name: "banchee-rest-1"
       host: "localhost"
 
   constructor: (@opts) ->
     _.bindAll @
     _.defaults @opts, @defaults
     @app = express()
-    @db = db.makeDatabase @opts.database
+    @db = db.makeDatabase @opts.database, =>
+      @dbReady = true
     @resources = {}
     @validators = {}
 
@@ -49,8 +56,27 @@ class Rest
     # resource.defineSchemaMiddleware()
     # resource.defineRoute()
 
+    #admin check
+    if @UserResource
+      @UserResource.Model.find {}, (err, docs) =>
+        @initAdmin() if docs.length is 0
+
     #finally listen
     @app.configure @configure
     @app.listen port
+    console.log "Listening on: #{port}"
+
+  #admin user must be created
+  initAdmin: ->
+
+    props = {
+      username: @opts.admin.username
+      password: @opts.admin.password
+    }
+
+    user = new @UserResource.Model props
+    user.save (err, doc) ->
+      console.log "Admin user created: #{JSON.stringify(props)}"
+
 
 exports.createServer = (opts) -> new Rest opts

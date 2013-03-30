@@ -11,13 +11,12 @@ server.addValidators({
   }
 });
 
-
 server.addResource({
   name: 'User',
+  isUser: true,
   schema: {
     foo: String,
-    bar: Number,
-    forums: ['Forum']
+    bar: Number
   }
 });
 
@@ -28,8 +27,7 @@ server.addResource({
     bar: Number,
     //forum has 1 user
     //users have many forums
-    owner: 'User',
-    posts: ['Post']
+    owner: 'User'
   },
   access: {
     c: 'admin',
@@ -49,3 +47,5 @@ server.addResource({
     forum: 'Forum'
   }
 });
+
+server.listen(1337);

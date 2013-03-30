@@ -3,7 +3,7 @@ mongoose = require("mongoose")
 
 console.log "load db"
 
-makeDatabase = (opts) ->
+makeDatabase = (opts, callback) ->
 
   # throw "process.env.NODE_ENV must be set" unless process.env.NODE_ENV
 
@@ -17,7 +17,8 @@ makeDatabase = (opts) ->
 
   db.on 'open', ->
     console.log "Successfully openned a connection to MongoDB (#{name})"
-  
+    callback() if callback
+
   db
 
 module.exports = {
