@@ -3,13 +3,13 @@ mongoose = require("mongoose")
 
 console.log "load db"
 
-makeDatabase = (name) ->
+makeDatabase = (opts) ->
 
   # throw "process.env.NODE_ENV must be set" unless process.env.NODE_ENV
 
-  name = "#{name}-dev"
+  name = opts.name
 
-  db = mongoose.createConnection("localhost", name)
+  db = mongoose.createConnection(opts.host, name)
 
   db.on 'error', (e) ->
     console.log "Cannot create a connection to MongoDB (#{e})"

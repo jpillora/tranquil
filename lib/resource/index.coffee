@@ -3,6 +3,9 @@ require './schema-extend'
 _ = require 'lodash'
 mongoose = require 'mongoose'
 
+LinkedResource = require './linked'
+userify = require './userify'
+
 console.log "load resource"
 
 #plugin variabless
@@ -30,12 +33,40 @@ class Resource
 
     _.defaults @config, @defaults
 
+    @routeName = @name.toLowerCase()
+
+    @checkConfig()
     @checkSchema()
     @defineSchema()
     @defineSchemaMiddleware()
     @defineRoute()
+    console.log @name, "resource ready"
+    
+  #CONFIG
+  checkConfig: ->
+    if @config.isUser or @routeName is 'user'
+      @rest.hasUser = true
+      userify @
 
   #SCHEMA
+  checkSchema: ->
+
+    #extract children
+    for key, val of @config.schema
+
+      if typeof val is 'string'
+        other = @rest.resources[val]
+        if other.Schema
+          @config.schema[key] = other.Schema
+
+      if _.isArray(val) and
+         val.length is 1 and
+         typeof val[0] is 'string'
+
+
+      
+
+
   defineSchema: ->
 
     #build mongoose schema
@@ -52,8 +83,12 @@ class Resource
       x = new @Model props
       x.save done
 
+    @Schema.resource = @
+
   defineSchemaMiddleware: ->
-    set = (time, type, fn) => @Schema[time](type, fn)
+    set = (time, type, fn) =>
+      if typeof fn is 'function'
+        @Schema[time](type, fn)
     
     middleware = @config.middleware
 
@@ -63,7 +98,7 @@ class Resource
         if typeof fns is 'array'
           for fn in fns
             setMiddleware time, type, fn
-        else if typeof fns is 'function'
+        else
           setMiddleware time, type, fns
 
   #ROUTES
