@@ -1,2 +1,2 @@
 require('coffee-script');
-require('./lib/rest');
+module.exports = require('./lib/rest');

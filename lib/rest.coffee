@@ -1,21 +1,23 @@
 
 Resource = require "./resource"
-SchemaManager = require "./resource"
 db = require "./db"
 _ = require "lodash"
+express = require "express"
 
 class Rest
   constructor: (@opts) ->
     _.bindAll @
     @app = express()
-    @configureApp()
     @db = db.makeDatabase "banchee-rest"
     @resources = {}
-    @schemaMgr = new SchemaManager @
 
-  add: (name, opts) ->
+  addResource: (opts) ->
+    name = opts.name
+    throw "Resource 'name' required" unless name
     throw "Resource '#{name}' already exists" if @resources[name] 
     @resources[name] = new Resource name, opts, @
+
+  addValidators: (opts) ->
 
   configureApp: ->
     @app.use express.logger("dev")
@@ -24,9 +26,19 @@ class Rest
     @app.use express.methodOverride()
     @app.use express.cookieParser("r3port3r")
     @app.use express.session()
-    @app.use passport.initialize()
-    @app.use passport.session()
-    @app.use app.router
+    # @app.use passport.initialize()
+    # @app.use passport.session()
+    @app.use @app.router
 
-module.exports =
-  createServer: (opts) -> new Rest opts
+  listen: (port) ->
+
+    # _.map @resources, (resource, name) ->
+    # resource.defineSchema()
+    # resource.defineSchemaMiddleware()
+    # resource.defineRoute()
+
+    #finally listen
+    @configureApp()
+    @app.listen port
+
+exports.createServer = (opts) -> new Rest opts

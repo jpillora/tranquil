@@ -1,6 +1,9 @@
 # build rest actions
+require './schema-extend'
 _ = require 'lodash'
 mongoose = require 'mongoose'
+
+console.log "load resource"
 
 #plugin variabless
 unimplemented = (req, res) -> res.status 501
@@ -8,22 +11,65 @@ unimplemented = (req, res) -> res.status 501
 #define
 class Resource
   
-  defaults:
-    idField: '_id'
-  
+  defaultConfig:
+    base: null
+    schemaOpts:
+      strict: true
+    middleware: {}
+
+  #ENTRY
   constructor: (@name, @config = {}, @rest) ->
 
     _.bindAll @
 
     unless _.isPlainObject @config
       throw "Configuration must be a plain object"
-    _.defaults @opts, @defaults
 
-    @routeName = @name.toLowerCase()
+    unless @config.schema
+      throw "Resource 'schema' required"
 
+    _.defaults @config, @defaults
+
+    @checkSchema()
+    @defineSchema()
+    @defineSchemaMiddleware()
+    @defineRoute()
+
+  #SCHEMA
   defineSchema: ->
 
+    #build mongoose schema
+    if typeof @config.extend is 'string'
+      Extend = @rest.resources[@config.extend]
+      @Schema =  Extend.extend @config.schema, @config.schemaOpts
+    else
+      @Schema = new mongoose.Schema @config.schema, @config.schemaOpts
+    
+    #build mongoose model
+    @Model = @rest.db.model @name, @Schema
+
+    @Schema.create = (props, done) =>
+      x = new @Model props
+      x.save done
+
+  defineSchemaMiddleware: ->
+    set = (time, type, fn) => @Schema[time](type, fn)
+    
+    middleware = @config.middleware
+
+    for time of middleware
+      for type of middleware[time]
+        fns = middleware[time][type]
+        if typeof fns is 'array'
+          for fn in fns
+            setMiddleware time, type, fn
+        else if typeof fns is 'function'
+          setMiddleware time, type, fns
+
+  #ROUTES
   defineRoute: ->
+    routeName = @name.toLowerCase()
+
 
     #each resource
     #create recursing routes
@@ -82,14 +128,5 @@ class Resource
       @json(res)(null, _.keys(@schema.paths))
 
 
-module.exports = {
-  set: (application) ->
-    app = application
-
-  add: (schema, opts) ->
-    throw "mongooseResource.set(app) first" unless app
-    r = new MongooseResource schema, opts
-    resources.push r
-    r
-}
+module.exports = Resource
 
