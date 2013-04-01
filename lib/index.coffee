@@ -51,15 +51,16 @@ class Rest
 
   listen: (port) ->
 
-    # _.map @resources, (resource, name) ->
-    # resource.defineSchema()
-    # resource.defineSchemaMiddleware()
-    # resource.defineRoute()
+    #initialize all
+    _.each @resources, (resource, name) ->
+      resource.initialize()
+
+      console.log resource.name, _.keys resource.children
 
     #admin check
     if @UserResource
       @UserResource.Model.find {}, (err, docs) =>
-        @initAdmin() if docs.length is 0
+        @makeAdmin() if docs.length is 0
 
     #finally listen
     @app.configure @configure
@@ -67,7 +68,7 @@ class Rest
     console.log "Listening on: #{port}"
 
   #admin user must be created
-  initAdmin: ->
+  makeAdmin: ->
 
     props = {
       username: @opts.admin.username

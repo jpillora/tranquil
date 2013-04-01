@@ -1,12 +1,9 @@
 # build rest actions
-require './schema-extend'
 _ = require 'lodash'
 mongoose = require 'mongoose'
-
+require './schema-extend'
 LinkedResource = require './linked'
 userify = require './userify'
-
-console.log "load resource"
 
 #plugin variabless
 unimplemented = (req, res) -> res.status 501
@@ -26,18 +23,17 @@ class Resource
     _.bindAll @
 
     unless _.isPlainObject @opts
-      throw "Optsuration must be a plain object"
+      throw "Options must be a plain object"
 
     unless @opts.schema
       throw "Resource 'schema' required"
 
-
-    console.log @name, "defaults", @defaults.middleware
-
-    @opts = _.extend {}, @defaults, @opts
+    _.defaults @opts, _.cloneDeep @defaults
 
     @routeName = @name.toLowerCase()
+    @children = {}
 
+  initialize: ->
     @checkOpts()
     @checkSchema()
     @defineSchema()
@@ -47,15 +43,9 @@ class Resource
     
   #CONFIG
   checkOpts: ->
-
-
-    console.log @name, @opts.middleware
-
     if @opts.isUser
       userify @
       @rest.UserResource = @
-
-    console.log @name, @opts.middleware
 
   #SCHEMA
   checkSchema: ->
@@ -63,17 +53,30 @@ class Resource
     #extract children
     for key, val of @opts.schema
 
-      if _.isArray(val) and val.length is 1
-        val = val[0]
-        isArray = true
+      #array check
+      isArray = _.isArray(val) and val.length is 1
+      val = val[0] if isArray
 
+      #link resource
       if typeof val is 'string'
         other = @rest.resources[val]
         if other and other.Schema
-          console.log "#{@name} found: #{other.name}"
-          @opts.schema[key] = mongoose.Schema.ObjectId
+          @linkResource isArray, key, other
         else
           throw "#{@name} could NOT find: #{val}"
+
+  linkResource: (isArray, field, other) ->
+
+    #single
+    unless isArray
+      @opts.schema[field] = mongoose.Schema.ObjectId
+      return
+
+    #array
+    #create routes on:
+    #  /this/:id/field/:id/
+    @opts.schema[field] = [mongoose.Schema.ObjectId]
+    @children[field] = other
 
   defineSchema: ->
 
@@ -109,7 +112,11 @@ class Resource
   #ROUTES
   defineRoute: ->
     routeName = @name.toLowerCase()
+    
+    
+    
 
+  defineRouteRecurse: (field, resource, parent) ->
 
     #each resource
     #create recursing routes

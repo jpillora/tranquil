@@ -11,22 +11,64 @@ server.addValidators({
   }
 });
 
+/*
+multi-parent
+
+file child of:
+  post - has attachments (files)
+  user - has dp (file)
+
+so:
+
+  File:
+    bytes
+    created
+    updated
+
+  User:
+    dp - File
+  Post:
+    attachments - [File]
+
+
+another example:
+
+  Company:
+    employees - [User]
+    owner - User
+    reports - [Report]
+
+  User:
+    company - Company
+    reports - [Report]
+  
+  Report
+    assignedFrom - User
+    assignedTo - User
+    elements - [Element]
+  
+  Element
+    type - [ElementType]
+    
+
+*/
+
 server.addResource({
   name: 'User',
+  company: 'Company',
   isUser: true,
   schema: {
-    foo: String,
-    bar: Number
+    a: String,
+    b: Number
   }
 });
 
 server.addResource({
-  name: 'Forum',
+  name: 'Company',
   schema: {
-    foo: String,
-    bar: Number,
-    //forum has 1 user
-    //users have many forums
+    c: String,
+    d: Number,
+    employees: ['User'],
     owner: 'User'
   },
   access: {
@@ -38,14 +80,16 @@ server.addResource({
 });
 
 server.addResource({
-  name: 'Post',
+  name: 'Report',
   schema: {
-    foo: String,
-    bar: Number,
-    //posts have 1 forum 
+    e: String,
+    f: Number,
+    //posts have 1 forum
     //forum has many posts
-    forum: 'Forum'
+    assignedBy: 'User',
+    assignedTo: 'User'
   }
 });
 
 server.listen(1337);
+
