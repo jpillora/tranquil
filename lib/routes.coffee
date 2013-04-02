@@ -36,7 +36,9 @@ class Routes
     @Model.find @parentQuery(req), @json(res)
 
   create: (req, res) ->
-    m = new @Model @extractFields(true, req)
+    props = @extractFields(true, req)
+    props.createdAt = new Date() if @rest.opts.timestamps
+    m = new @Model props
     m.save @json(res)
 
   show: (req, res) ->

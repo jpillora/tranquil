@@ -47,7 +47,8 @@ another example:
 var tranquil = require("../index");
 
 var server = tranquil.createServer({
-  baseUrl: '/api'
+  baseUrl: '/api',
+  timestamps: true
 });
 
 server.addValidators({

@@ -3,6 +3,7 @@ _ = require 'lodash'
 mongoose = require 'mongoose'
 require './schema-extend'
 userify = require './userify'
+timestampify = require './timestampify'
 Routes = require './routes'
 
 #plugin variabless
@@ -46,6 +47,9 @@ class Resource
     if @opts.isUser
       userify @
       @rest.UserResource = @
+
+    if @rest.opts.timestamps
+      timestampify @
 
   #SCHEMA
   checkSchema: ->
@@ -100,9 +104,13 @@ class Resource
 
   defineSchemaMiddleware: ->
     set = (time, type, fn) =>
-      if typeof fn is 'function'
+      t = typeof fn
+      if t is 'function'
         @Schema[time](type, fn)
         console.log "set middleware: #{time} #{type}"
+      else
+        console.log fn
+        throw "Invalid middleware #{time} #{type} type: #{t}"
     
     middleware = @opts.middleware
 

@@ -1,7 +1,7 @@
 Tranquil
 ====
 
-v0.0.2 (Very) Beta
+v0.0 (Very) Beta
 
 Generate powerful RESTful JSON APIs
 
