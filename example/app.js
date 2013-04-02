@@ -1,17 +1,7 @@
-var bancheeRest = require("../index");
-
-var server = bancheeRest.createServer({
-  baseUrl: '/api'
-});
-
-server.addValidators({
-  email: {
-    validator: function() {},
-    msg: "blah"
-  }
-});
 
 /*
+IDEAS
+
 multi-parent
 
 file child of:
@@ -53,13 +43,39 @@ another example:
 
 */
 
+
+var tranquil = require("../index");
+
+var server = tranquil.createServer({
+  baseUrl: '/api'
+});
+
+server.addValidators({
+  email: {
+    validator: function(e) {
+      return !!e.match(/@/);
+    },
+    msg: "yo missin da @ !"
+  }
+});
+
 server.addResource({
   name: 'User',
   company: 'Company',
   isUser: true,
   schema: {
-    a: String,
+    a: {
+      type: String,
+      validate: ['email']
+    },
     b: Number
+  },
+  middleware: {
+    post: {
+      save: function(doc) {
+        console.log("saved", doc);
+      }
+    }
   }
 });
 

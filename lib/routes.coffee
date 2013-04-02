@@ -1,31 +1,35 @@
 
+_ = require 'lodash'
 
 class Routes
-  constructor: (@resource, baseUrl, @parent) ->
+  constructor: (@resource, @parent) ->
 
-    { @Schema, @Model, @rest, @app } = @resource
+    _.bindAll @
+
+    { @Schema, @Model, @rest } = @resource
+    { @app } = @rest
 
     @idField = @resource.opts.idField
-
-    @url = "#{baseUrl or @rest.opts.baseUrl}/#{@resource.routeName}"
-    @id = "/:#{@resource.routeName}"
+    @name = @resource.routeName
+    @url = "#{@parent and @parent.url or @rest.opts.baseUrl}/#{@name}"
+    @id = "/:#{@name}"
 
     console.log @resource.name, "route:", @url+@id
 
-    _.bindAll @
     @routeAll()
 
   routeAll: ->
+
     #CREATE
-    app.post url,   @create
+    @app.post @url,    @create
     #READ (ALL)
-    app.get url,    @index
+    @app.get @url,     @index
     #READ (ONE)
-    app.get url+id, @show
+    @app.get @url+@id, @show
     #UPDATE
-    app.put url+id, @update
+    @app.put @url+@id, @update
     #DELETE
-    app.del url+id, @delete
+    @app.del @url+@id, @delete
 
   index: (req, res) ->
     query = {}
@@ -39,14 +43,16 @@ class Routes
     @Model.findOne @idQuery(req), @json(res)
 
   update: (req, res) ->
-    @Model.findOne @idQuery(req), @json(res), (doc) =>
+    query = @idQuery(req)
+    @Model.findOne query, @json(res, (doc) =>
       _.extend doc, @extractFields(false, req)
       doc.save @json(res)
+    )
 
   delete: (req, res) ->
-    @Model.findOne @idQuery(req), @json(res), (doc) =>
+    @Model.findOne @idQuery(req), @json(res, (doc) =>
       doc.remove @json(res)
-
+    )
   # new: (req, res) ->
   #   @json(res)(null, _.keys(@Schema.paths))
 
@@ -56,8 +62,10 @@ class Routes
   extractFields: (isNew, req) ->
     fields = {}
 
+    console.log isNew, req.body
+
     @Schema.eachPath (p) ->
-      fields[p] = req.body[p] if req.body[p]
+      fields[p] = req.body[p] if p of req.body
 
     if isNew and @rest.hasUser and req.user
       fields.createdBy = req.user
@@ -67,7 +75,7 @@ class Routes
   #build a query that identifies the object
   #specified in the request
   idQuery: (req, query = {}) ->
-    query[@opts.idField] = req.params[@name]
+    query[@idField] = req.params[@name]
     @parentQuery req, query
 
   #build a query that identifies the object
@@ -83,10 +91,12 @@ class Routes
   json: (res, success)->
     (err, doc) ->
       if err
-        res.send 400, { error: err.message }
+        res.send 400, { error: err }
       else if doc is null
         res.send 404, "Not Found"
       else if typeof success is 'function'
-        success res, doc
+        success doc
       else 
         res.json doc
+
+module.exports = Routes

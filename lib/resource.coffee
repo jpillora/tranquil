@@ -3,6 +3,7 @@ _ = require 'lodash'
 mongoose = require 'mongoose'
 require './schema-extend'
 userify = require './userify'
+Routes = require './routes'
 
 #plugin variabless
 unimplemented = (req, res) -> res.status 501
@@ -63,6 +64,13 @@ class Resource
           @linkResource isArray, key, other
         else
           throw "#{@name} could NOT find: #{val}"
+      
+      if _.isPlainObject(val) and _.isArray(val.validate)
+        val.validate = _.map val.validate, (str) =>
+          return str if typeof str isnt 'string'
+          validator = @rest.validators[str]
+          throw "Missing validator: #{str}" unless validator
+          return validator
 
   linkResource: (isArray, field, other) ->
 
@@ -72,8 +80,6 @@ class Resource
       return
 
     #array
-    #create routes on:
-    #  /this/:id/field/:id/
     @opts.schema[field] = [mongoose.Schema.ObjectId]
     @children[field] = other
 
@@ -82,6 +88,7 @@ class Resource
     #build mongoose schema
     if typeof @opts.extend is 'string'
       Extend = @rest.resources[@opts.extend]
+      throw "Missing #{@opts.extend}" unless Extend
       @Schema =  Extend.extend @opts.schema, @opts.schemaOpts
     else
       @Schema = new mongoose.Schema @opts.schema, @opts.schemaOpts
@@ -95,7 +102,7 @@ class Resource
     set = (time, type, fn) =>
       if typeof fn is 'function'
         @Schema[time](type, fn)
-        console.log @, "set middleware: #{time} #{type}"
+        console.log "set middleware: #{time} #{type}"
     
     middleware = @opts.middleware
 
@@ -111,7 +118,7 @@ class Resource
   #ROUTES
   defineRoute: (parent) ->
     #define this resource's routes
-    routes = new Routes @, baseUrl, parent    
+    routes = new Routes @, parent    
     #define child routes ontop
     for n, child of @children
       child.defineRoute routes

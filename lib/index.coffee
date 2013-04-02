@@ -26,6 +26,7 @@ class Rest
       @dbReady = true
     @resources = {}
     @validators = {}
+    @app.configure @configure
 
   addResource: (opts) ->
     name = opts.name
@@ -37,6 +38,7 @@ class Rest
     _.extend @validators, validators
 
   configure: ->
+    console.log "Express Configure"
     @app.use express.logger("dev")
     @app.use express.compress()
     @app.use express.bodyParser()
@@ -62,7 +64,6 @@ class Rest
         @makeAdmin() if docs.length is 0
 
     #finally listen
-    @app.configure @configure
     @app.listen port
     
     console.log "Listening on: #{port}"
