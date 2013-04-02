@@ -14,7 +14,7 @@ class Rest
       username: "admin"
       password: guid()+guid()
     database:
-      name: "banchee-rest-1"
+      name: "tranquil"
       host: "localhost"
 
   constructor: (@opts) ->

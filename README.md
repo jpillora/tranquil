@@ -1,15 +1,17 @@
 Tranquil
 ====
 
-v0.0.1
+v0.0.2 (Very) Beta
 
 Generate powerful RESTful JSON APIs
+
+`npm install tranquil`
 
 Beta API:
 
 ``` javascript
 
-var tranquil = require("../index");
+var tranquil = require("tranquil");
 
 var server = tranquil.createServer({
   baseUrl: '/api'
@@ -52,6 +54,7 @@ server.addResource({
     employees: ['User'],
     owner: 'User'
   },
+  //not implemented yet
   access: {
     c: 'admin',
     r: true,

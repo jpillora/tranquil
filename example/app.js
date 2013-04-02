@@ -61,14 +61,14 @@ server.addValidators({
 
 server.addResource({
   name: 'User',
-  company: 'Company',
   isUser: true,
   schema: {
     a: {
       type: String,
       validate: ['email']
     },
-    b: Number
+    b: Number,
+    company: 'Company'
   },
   middleware: {
     post: {

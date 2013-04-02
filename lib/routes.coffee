@@ -62,8 +62,6 @@ class Routes
   extractFields: (isNew, req) ->
     fields = {}
 
-    console.log isNew, req.body
-
     @Schema.eachPath (p) ->
       fields[p] = req.body[p] if p of req.body
 
