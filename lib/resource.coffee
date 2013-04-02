@@ -2,7 +2,6 @@
 _ = require 'lodash'
 mongoose = require 'mongoose'
 require './schema-extend'
-LinkedResource = require './linked'
 userify = require './userify'
 
 #plugin variabless
@@ -12,7 +11,7 @@ unimplemented = (req, res) -> res.status 501
 class Resource
   
   defaults:
-    base: null
+    idField: '_id'
     schemaOpts:
       strict: true
     middleware: {}
@@ -110,69 +109,13 @@ class Resource
     null
 
   #ROUTES
-  defineRoute: ->
-    routeName = @name.toLowerCase()
-    
-    
-    
+  defineRoute: (parent) ->
+    #define this resource's routes
+    routes = new Routes @, baseUrl, parent    
+    #define child routes ontop
+    for n, child of @children
+      child.defineRoute routes
 
-  defineRouteRecurse: (field, resource, parent) ->
-
-    #each resource
-    #create recursing routes
-
-
-  extractFields: (req) ->
-    fields = {}
-    @schema.eachPath (p) ->
-      fields[p] = req.body[p] if p of req.body
-    _.extend fields, @parentQuery(req)
-    fields.createdBy = req.user if @opts.includeUser
-    console.log fields
-    fields
-
-  idQuery: (req, query = {}) ->
-    query[@opts.idField] = req.params[@name]
-    @parentQuery req, query
-
-  parentQuery: (req, query = {}) ->
-    p = @parent
-    while p
-      query[p.name] = req.params[p.name]
-      p = p.parent
-    console.log query
-    query
-
-  json: (res, success)->
-    (err, doc) ->
-      if err
-        res.send 400, { error: err.message }
-      else if doc is null
-        res.send 404, "Not Found"
-      else if typeof success is 'function'
-        success doc
-      else 
-        res.json doc
-
-  buildActions: ->
-    index: (req, res) =>
-      @m.find @parentQuery(req), @json(res)
-    create: (req, res) =>
-      m = new @m @extractFields req
-      m.save @json(res)
-    show: (req, res) =>
-      @m.findOne @idQuery(req), @json(res)
-    update: (req, res) =>
-      @m.findOne @idQuery(req), @json res, (doc) =>
-        _.extend doc, @extractFields(req)
-        doc.save @json(res)
-    destroy: (req, res) =>
-      @m.findOne @idQuery(req), @json res, (doc) =>
-        doc.remove @json(res)
-    edit: unimplemented
-    # new: unimplemented
-    new: (req, res) =>
-      @json(res)(null, _.keys(@schema.paths))
 
   #helpers
   toString: -> @name + ": "

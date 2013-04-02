@@ -1,7 +1,7 @@
 var bancheeRest = require("../index");
 
 var server = bancheeRest.createServer({
-  url: '/api'
+  baseUrl: '/api'
 });
 
 server.addValidators({
@@ -34,8 +34,8 @@ so:
 another example:
 
   Company:
-    employees - [User]
     owner - User
+    employees - [User]
     reports - [Report]
 
   User:

@@ -9,7 +9,7 @@ guid = -> (Math.random()*Math.pow(2,32)).toString(16)
 class Rest
 
   defaults:
-    url: ''
+    baseUrl: ''
     admin:
       username: "admin"
       password: guid()+guid()
@@ -20,6 +20,7 @@ class Rest
   constructor: (@opts) ->
     _.bindAll @
     _.defaults @opts, @defaults
+
     @app = express()
     @db = db.makeDatabase @opts.database, =>
       @dbReady = true
@@ -55,8 +56,6 @@ class Rest
     _.each @resources, (resource, name) ->
       resource.initialize()
 
-      console.log resource.name, _.keys resource.children
-
     #admin check
     if @UserResource
       @UserResource.Model.find {}, (err, docs) =>
@@ -65,6 +64,7 @@ class Rest
     #finally listen
     @app.configure @configure
     @app.listen port
+    
     console.log "Listening on: #{port}"
 
   #admin user must be created
