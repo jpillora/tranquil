@@ -28,6 +28,11 @@ class Rest
     @validators = {}
     @app.configure @configure
 
+  #API
+  addUserResource: (opts) ->
+    throw "user insert"
+    @addResource opts
+
   addResource: (opts) ->
     name = opts.name
     throw "Resource 'name' required" unless name

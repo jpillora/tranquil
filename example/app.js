@@ -44,7 +44,7 @@ another example:
 */
 
 
-var tranquil = require("../index");
+var tranquil = require("../");
 
 var server = tranquil.createServer({
   baseUrl: '/api',
@@ -60,9 +60,13 @@ server.addValidators({
   }
 });
 
-server.addResource({
+server.addUserResource({
   name: 'User',
-  isUser: true,
+  roles: {
+    'admin': 3,
+    'user': 2,
+    'guest': 1
+  },
   schema: {
     a: {
       type: String,
@@ -89,7 +93,9 @@ server.addResource({
     owner: 'User'
   },
   access: {
-    c: 'admin',
+    c: {
+      allow: 'admin'
+    },
     r: true,
     u: ['admin', 'moderator'],
     d: false

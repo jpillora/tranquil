@@ -18,6 +18,9 @@ module.exports = (resource) ->
       password:
         type: String
         required: true
+      
+      roles:
+        type [String]
     
     middleware:
       pre:
