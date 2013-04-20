@@ -1,4 +1,4 @@
-# build rest actions
+# build tranq actions
 _ = require 'lodash'
 mongoose = require 'mongoose'
 require './schema-extend'
@@ -19,16 +19,21 @@ class Resource
     middleware: {}
 
   #ENTRY
-  constructor: (@name, @opts = {}, @rest) ->
+  constructor: (@name, @opts = {}, @tranq) ->
 
     _.bindAll @
 
     unless _.isPlainObject @opts
-      throw "Options must be a plain object"
-
-    @opts.schema = {} unless @opts.schema
+      @error "Options must be a plain object"
 
     _.defaults @opts, _.cloneDeep @defaults
+
+    #no schema
+    unless @opts.schema
+      #auto lazy schema on non-user objs
+      unless @opts.isUser
+        @opts.schemaOpts.strict = false
+      @opts.schema = {}
 
     @routeName = @name.toLowerCase()
     @children = {}
@@ -39,15 +44,15 @@ class Resource
     @defineSchema()
     @defineSchemaMiddleware()
     @defineRoute()
-    console.log @name, "resource ready"
+    @log "ready"
     
   #CONFIG
   checkOpts: ->
     if @opts.isUser
       userify @
-      @rest.UserResource = @
+      @tranq.UserResource = @
 
-    if @rest.opts.timestamps
+    if @tranq.opts.timestamps
       timestampify @
 
   #SCHEMA
@@ -62,26 +67,24 @@ class Resource
 
       #link resource
       if typeof val is 'string'
-        other = @rest.resources[val]
+        other = @tranq.resources[val]
         if other and other.Schema
           @linkResource isArray, key, other
         else
-          throw "#{@name} could NOT find: #{val}"
+          @error "could NOT find: #{val}"
       
       if _.isPlainObject(val) and _.isArray(val.validate)
         val.validate = _.map val.validate, (str) =>
           return str if typeof str isnt 'string'
-          validator = @rest.validators[str]
-          throw "Missing validator: #{str}" unless validator
+          validator = @tranq.validators[str]
+          @error "Missing validator: #{str}" unless validator
           return validator
 
   linkResource: (isArray, field, other) ->
-
     #single
     unless isArray
       @opts.schema[field] = mongoose.Schema.ObjectId
       return
-
     #array
     @opts.schema[field] = [mongoose.Schema.ObjectId]
     @children[field] = other
@@ -90,32 +93,31 @@ class Resource
 
     #build mongoose schema
     if typeof @opts.extend is 'string'
-      Extend = @rest.resources[@opts.extend]
-      throw "Missing #{@opts.extend}" unless Extend
+      Extend = @tranq.resources[@opts.extend]
+      @error "#Cannot extend. Missing schema: #{@opts.extend}" unless Extend
       @Schema =  Extend.extend @opts.schema, @opts.schemaOpts
     else
       @Schema = new mongoose.Schema @opts.schema, @opts.schemaOpts
     
     #build mongoose model
-    @Model = @rest.db.model @name, @Schema
+    @Model = @tranq.db.model @name, @Schema
     #back ref
     @Schema.resource = @
 
   defineSchemaMiddleware: ->
     set = (time, type, fn) =>
-      t = typeof fn
-      if t is 'function'
+      if _.isFunction fn
         @Schema[time](type, fn)
-        console.log "set middleware: #{time} #{type}"
+        @log "middleware: #{time} #{type}"
       else
-        console.log fn
-        throw "Invalid middleware #{time} #{type} type: #{t}"
+        @log fn
+        @error "Invalid middleware #{time} #{type}"
     
     middleware = @opts.middleware
 
     for time, types of middleware
       for type, fns of types
-        if typeof fns is 'array'
+        if _.isArray fns
           for fn in fns
             set time, type, fn
         else
@@ -130,9 +132,17 @@ class Resource
     for n, child of @children
       child.defineRoute routes
 
+  log: ->
+    a = Array.prototype.slice.call arguments
+    a.unshift @.toString()
+    console.log.apply console, a
+
+  error: (s) ->
+    throw "#{@} #{s}"
 
   #helpers
-  toString: -> @name + ": "
+  toString: ->
+    "Resource: #{@name}:"
 
 module.exports = Resource
 

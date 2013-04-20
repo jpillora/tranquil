@@ -6,7 +6,7 @@ express = require "express"
 
 guid = -> (Math.random()*Math.pow(2,32)).toString(16)
 
-class Rest
+class Tranquil
 
   defaults:
     baseUrl: ''
@@ -24,13 +24,16 @@ class Rest
     @app = express()
     @db = db.makeDatabase @opts.database, =>
       @dbReady = true
+
     @resources = {}
     @validators = {}
     @app.configure @configure
 
   #API
   addUserResource: (opts) ->
-    throw "user insert"
+    if @UserResource
+      throw "only 1 user resource is allowed"
+    opts.isUser = true
     @addResource opts
 
   addResource: (opts) ->
@@ -51,10 +54,10 @@ class Rest
     @app.use express.compress()
     @app.use express.bodyParser()
     @app.use express.methodOverride()
-    @app.use express.cookieParser("r3port3r")
+    @app.use express.cookieParser "s3cret"
     @app.use express.session()
 
-    if @hasUser
+    if @UserResource
       @app.use passport.initialize()
       @app.use passport.session()
     
@@ -82,6 +85,7 @@ class Rest
     props = {
       username: @opts.admin.username
       password: @opts.admin.password
+      roles: ['admin']
     }
 
     user = new @UserResource.Model props
@@ -89,4 +93,4 @@ class Rest
       console.log "Admin user created: #{JSON.stringify(props)}"
 
 
-exports.createServer = (opts) -> new Rest opts
+exports.createServer = (opts) -> new Tranquil opts

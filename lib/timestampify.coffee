@@ -2,7 +2,7 @@ util = require "./util"
 
 module.exports = (resource) ->
 
-  console.log "timestampify!"
+  resource.log "timestampify!"
 
   #add user into into schema
   util.mixin resource.opts, {

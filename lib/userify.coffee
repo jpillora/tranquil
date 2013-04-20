@@ -5,7 +5,7 @@ passwordHash = require('password-hash')
 
 module.exports = (resource) ->
 
-  console.log "userify!"
+  resource.log "userify!"
 
   #add user into into schema
   util.mixin resource.opts, {
@@ -20,17 +20,14 @@ module.exports = (resource) ->
         required: true
       
       roles:
-        type [String]
+        type: [String]
     
     middleware:
       pre:
-        save: [
-          #hash password on the way in
-          (next) ->
-            #console.log "check password"
-            @password = passwordHash.generate @password if @password
-            next()
-
+        #hash password on the way in
+        save: [(next) ->
+          @password = passwordHash.generate @password if @password
+          next()
         ]
   }
 
@@ -56,7 +53,7 @@ module.exports = (resource) ->
   passport.use new LocalStrategy {passReqToCallback:true}, verify
 
   #add routes
-  {app, opts} = resource.rest
+  {app, opts} = resource.tranq
 
   app.get "#{opts.url}/login", passport.authenticate('local'), (req, res) ->
     res.json {result: 'success', user: req.user}

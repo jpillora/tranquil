@@ -9,19 +9,24 @@ class Routes
 
     _.bindAll @
 
-    { @Schema, @Model, @rest } = @resource
-    { @app } = @rest
+    { @Schema, @Model, @tranq } = @resource
+    { @app } = @tranq
 
     @idField = @resource.opts.idField
     @name = @resource.routeName
-    @url = "#{@parent and @parent.url or @rest.opts.baseUrl}/#{@name}"
+    @url = "#{@parent and @parent.url or @tranq.opts.baseUrl}/#{@name}"
     @id = "/:#{@name}"
 
-    console.log @resource.name, "route:", @url+@id
+    @resource.log "route:", @url+@id
 
     @routeAll()
 
   routeAll: ->
+
+    @app.all "#{@url}/*", (req, res, next) =>
+      @resource.log "middleware!"
+      debugger
+      next()
 
     #CREATE
     @app.post @url,    @create
@@ -41,7 +46,7 @@ class Routes
   create: (req, res) ->
     props = @extractFields true, req
     props = @addParentField req, query
-    props.createdAt = new Date() if @rest.opts.timestamps
+    props.createdAt = new Date() if @tranq.opts.timestamps
     props
     m = new @Model props
     m.save @json(res)
@@ -75,7 +80,7 @@ class Routes
     else
       fields = req.body
 
-    if isNew and @rest.hasUser and req.user
+    if isNew and @tranq.hasUser and req.user
       fields.createdBy = req.user
 
     fields
