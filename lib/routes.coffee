@@ -14,28 +14,21 @@ class Routes
 
     @idField = @resource.opts.idField
     @name = @resource.routeName
-    @url = "#{@parent and @parent.url or @tranq.opts.baseUrl}/#{@name}"
+    @url = "#{if @parent then @parent.url+@parent.id else @tranq.opts.baseUrl}/#{@name}"
     @id = "/:#{@name}"
 
     @resource.log "route:", @url+@id
 
-    @routeAll()
-
-  routeAll: ->
-    # @app.all "#{@url}/*", (req, res, next) =>
-    #   @resource.log "middleware!"
-    #   next()
-
     #CREATE
-    @routeOne 'create', @url
+    @route 'create', @url
     #READ (optional id)   
-    @routeOne 'read' ,  @url+"\/?(:#{@name})?"
+    @route 'read' ,  @url+"\/?(:#{@name})?"
     #UPDATE
-    @routeOne 'update', @url+@id
+    @route 'update', @url+@id
     #DELETE
-    @routeOne 'delete', @url+@id
+    @route 'delete', @url+@id
 
-  routeOne: (verb, path) ->
+  route: (verb, path) ->
 
     access = @resource.getAccess verb
     
@@ -49,7 +42,6 @@ class Routes
     fn = @[verb]
     unless fn
       @resource.error "Missing verb function: #{verb}"
-
 
     middleware = []
 
@@ -111,15 +103,7 @@ class Routes
   
   #extract schema fields from request
   extractFields: (req) ->
-    fields = {}
-
-    if @resource.opts.schemaOpts.strict
-      @Schema.eachPath (p) ->
-        fields[p] = req.body[p] if p of req.body
-    else
-      fields = req.body
-
-    fields
+    req.body
 
   #build a query that identifies the object
   #specified in the request

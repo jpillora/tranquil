@@ -30,6 +30,7 @@ setupPassport = (resource) ->
   passport.use new LocalStrategy verify
 
 mixinUserSchema = (resource) ->
+
   #add user into into schema
   util.mixin resource.opts, {
     schema:
@@ -62,16 +63,8 @@ mixinUserSchema = (resource) ->
   }
 
 
-bindRoutes = (tranq) ->
-
-  console.log "ROUTES PASSPORT"
-
-  #add routes
-  {app, opts} = tranq
-
-  url = opts.baseUrl + '/auth'
-
-  tranq.log "bind auth routes"
+bindRoutes = (resource, app, tranq) ->
+  url = tranq.opts.baseUrl + '/auth'
 
   app.post "#{url}/login", passport.authenticate('local'), (req, res) ->
     res.json {result: 'success', user: req.user}
@@ -83,7 +76,10 @@ bindRoutes = (tranq) ->
   app.get "#{url}/user", (req, res) ->
     res.json has_user: if req.user then req.user else null
 
+  tranq.log "Bound auth routes"
+
 mixinCreatedBy = (resource) ->
+  
   util.mixin resource.opts, {
     schema:
       createdBy:

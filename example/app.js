@@ -1,60 +1,17 @@
-
-/*
-IDEAS
-
-multi-parent
-
-file child of:
-  post - has attachments (files)
-  user - has dp (file)
-
-so:
-
-  File:
-    bytes
-    created
-    updated
-
-  User:
-    dp - File
-  Post:
-    attachments - [File]
-
-
-another example:
-
-  Company:
-    owner - User
-    employees - [User]
-    reports - [Report]
-
-  User:
-    company - Company
-    reports - [Report]
-  
-  Report
-    assignedFrom - User
-    assignedTo - User
-    elements - [Element]
-  
-  Element
-    type - [ElementType]
-    
-
-*/
-
-
 var tranquil = require("../");
 
 var server = tranquil.createServer({
   baseUrl: '/api',
-  timestamps: true
+  resource: {
+    timestamps: true,
+    mixins: ['createdBy']
+  }
 });
 
 server.addValidators({
   email: {
-    validator: function(e) {
-      return !!e.match(/@/);
+    validator: function(input) {
+      return !!input.match(/@/);
     },
     msg: "yo missin da @ !"
   }
@@ -73,7 +30,7 @@ server.addUserResource({
   middleware: {
     post: {
       save: function(doc) {
-        console.log("saved", doc);
+        console.log("created user", doc.username);
       }
     }
   }
@@ -88,9 +45,7 @@ server.addResource({
     owner: 'User'
   },
   access: {
-    c: {
-      allow: 'admin'
-    },
+    c: 'admin',
     r: true,
     u: ['admin', 'moderator'],
     d: false
@@ -106,6 +61,9 @@ server.addResource({
     //forum has many posts
     assignedBy: 'User',
     assignedTo: 'User'
+  },
+  access: {
+    create: true
   }
 });
 

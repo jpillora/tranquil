@@ -1,6 +1,6 @@
 {
   "name": "tranquil",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Generate powerful RESTful JSON APIs",
   "main": "index.js",
   "scripts": {
@@ -32,6 +32,7 @@
     "passport": "~0.1.16",
     "inflection": "~1.2.5",
     "express": "~3.1.1",
-    "validate": "~0.2.3"
+    "validate": "~0.2.3",
+    "methods": "0.0.1"
   }
 }

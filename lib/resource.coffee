@@ -17,7 +17,7 @@ class Resource
   #ENTRY
   constructor: (@name, @opts = {}, @tranq) ->
 
-    @log "constructing"
+    @log "added"
     _.bindAll @
 
     unless _.isPlainObject @opts
@@ -26,13 +26,11 @@ class Resource
     #lazy schema on non-user objs
     if not @opts.schema and @opts.isUser is `undefined`
       @opts.schemaOpts = {} unless @opts.schemaOpts
-
+      @log "strict mode OFF"
       @opts.schemaOpts.strict = false
 
     #apply defaults
     _.defaults @opts, _.cloneDeep @tranq.defaults.resource
-
-    @log "strict mode", @opts.schemaOpts.strict
 
     #this is user resource
     @tranq.UserResource = @ if @opts.isUser
@@ -40,16 +38,13 @@ class Resource
     @routeName = @name.toLowerCase()
     @children = {}
 
-  check: ->
+  initialize: ->
     @applyMixins()
-    @checkSchema()
-    @log "checked"
-
-  bind: ->
+    @linkSchema()
     @defineSchema()
     @defineSchemaMiddleware()
     @defineRoute()
-    @log "bound"
+    @log "initialized"
     
   #CONFIG
   applyMixins: ->
@@ -62,11 +57,11 @@ class Resource
     if @tranq.UserResource
       userify.createdBy @
 
-    if @tranq.opts.timestamps
+    if @opts.timestamps
       timestampify @
 
   #SCHEMA
-  checkSchema: ->
+  linkSchema: ->
 
     #extract children
     for key, type of @opts.schema
@@ -86,7 +81,7 @@ class Resource
         other = @tranq.resources[type]
 
         #listed schema must exist
-        unless other and other.Schema
+        unless other
           @error "could NOT find: #{type}"
 
         #convert string to objectid and store ref.
@@ -97,8 +92,8 @@ class Resource
           parent[key] = mongoose.Schema.ObjectId
 
       #map across validator functions
-      if _.isPlainObject(type) and _.isArray(type.validate)
-        type.validate = _.map type.validate, (str) =>
+      if _.isPlainObject(parent) and _.isArray(parent.validate)
+        parent.validate = _.map parent.validate, (str) =>
           return str if typeof str isnt 'string'
           validator = @tranq.validators[str]
           @error "Missing validator: #{str}" unless validator
@@ -147,6 +142,8 @@ class Resource
       for key, value of @opts.access
         if char is key.charAt(0)
           return value
+      #not defined
+      return false
 
     t = typeof @opts.access
     if t isnt 'string' and t isnt 'boolean'
@@ -157,8 +154,8 @@ class Resource
   #ROUTES
   defineRoute: (parent) ->
 
-    if @opts.isUser
-      userify.routes @tranq
+    if not parent and @opts.isUser
+      userify.routes @, @tranq.app, @tranq
 
     #define this resource's routes
     routes = new Routes @, parent    

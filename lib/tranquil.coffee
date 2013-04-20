@@ -3,6 +3,7 @@ Resource = require "./resource"
 db = require "./db"
 _ = require "lodash"
 express = require "express"
+methods = require "methods"
 
 guid = -> (Math.random()*Math.pow(2,32)).toString(16)
 
@@ -29,13 +30,27 @@ class Tranquil
         strict: true
       middleware: {}
       express: {}
+    rateLimit:
+      mode: 'ip' #or 'session'
+      num:  1
+      per: 1000
 
   constructor: (@opts) ->
     _.bindAll @
     _.defaults @opts, @defaults
 
     @app = express()
+
+    @expressRoutes = {}
+    methods.concat(['all']).forEach (n) =>
+      @expressRoutes[n] =
+        fn:@app[n]
+        calls: []
+      @app[n] = => 
+        @expressRoutes[n].calls.push arguments
+
     @db = db.makeDatabase @opts.database, =>
+      @log "Connected to MongoDB (#{@opts.database.name})"
       @dbReady = true
 
     @resources = {}
@@ -66,9 +81,11 @@ class Tranquil
     unless Object.keys(@resources).length
       @error "At least 1 resource is required"
 
-    #check all resources
+    #init all resources
     for name, resource of @resources
-      resource.check()
+      resource.initialize()
+
+    @log "initialized all resources"
 
     #configure express
     @app.configure =>
@@ -80,12 +97,7 @@ class Tranquil
       @app.use express.cookieParser "s3cret"
       @app.use express.session()
 
-      # passport = require('passport')
-
-      # @app.use passport.initialize()
-      # @app.use passport.session()
-
-      #express options
+      #plugins
       for name, resource of @resources
         express = resource.opts.express
         if express and _.isArray express.use
@@ -95,11 +107,12 @@ class Tranquil
 
       @app.use @app.router
 
-    #bind all resources
-    for name, resource of @resources
-      resource.bind()
-
-    @log "initialized all resources"
+    #run accumulated express routes
+    for name, route of @expressRoutes
+      continue if route.calls.length is 0
+      @log 'bind', route.calls.length, name, 'handlers'
+      for args in route.calls
+        route.fn.apply @app, args
 
     #admin check
     if @UserResource
@@ -124,7 +137,6 @@ class Tranquil
     user.save (err, doc) =>
       @error err if err
       @log "Admin user created: #{JSON.stringify(props)}"
-      @log doc
 
   #helpers
   log: ->
