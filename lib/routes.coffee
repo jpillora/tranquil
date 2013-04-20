@@ -2,6 +2,9 @@
 _ = require 'lodash'
 
 class Routes
+
+  parentField: '_parentId'
+
   constructor: (@resource, @parent) ->
 
     _.bindAll @
@@ -33,26 +36,28 @@ class Routes
 
   index: (req, res) ->
     query = {}
-    @Model.find @parentQuery(req), @json(res)
+    @Model.find @addParentField(req), @json(res)
 
   create: (req, res) ->
-    props = @extractFields(true, req)
+    props = @extractFields true, req
+    props = @addParentField req, query
     props.createdAt = new Date() if @rest.opts.timestamps
+    props
     m = new @Model props
     m.save @json(res)
 
   show: (req, res) ->
-    @Model.findOne @idQuery(req), @json(res)
+    @Model.findOne @addIdField(req), @json(res)
 
   update: (req, res) ->
-    query = @idQuery(req)
+    query = @addIdField(req)
     @Model.findOne query, @json(res, (doc) =>
       _.extend doc, @extractFields(false, req)
       doc.save @json(res)
     )
 
   delete: (req, res) ->
-    @Model.findOne @idQuery(req), @json(res, (doc) =>
+    @Model.findOne @addIdField(req), @json(res, (doc) =>
       doc.remove @json(res)
     )
   # new: (req, res) ->
@@ -64,8 +69,11 @@ class Routes
   extractFields: (isNew, req) ->
     fields = {}
 
-    @Schema.eachPath (p) ->
-      fields[p] = req.body[p] if p of req.body
+    if @resource.opts.schemaOpts.strict
+      @Schema.eachPath (p) ->
+        fields[p] = req.body[p] if p of req.body
+    else
+      fields = req.body
 
     if isNew and @rest.hasUser and req.user
       fields.createdBy = req.user
@@ -74,17 +82,16 @@ class Routes
 
   #build a query that identifies the object
   #specified in the request
-  idQuery: (req, query = {}) ->
+  addIdField: (req, query = {}) ->
     query[@idField] = req.params[@name]
-    @parentQuery req, query
+    @addParentField req, query
 
   #build a query that identifies the object
   #specified in the request
-  parentQuery: (req, query = {}) ->
+  addParentField: (req, query = {}) ->
     if @parent
-      field = @parent.idField
       name = @parent.resource.routeName
-      query[@idField] = req.params[name]
+      query[@parentField] = req.params[name]
     query
 
   #callback function generator

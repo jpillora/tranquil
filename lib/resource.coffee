@@ -26,8 +26,7 @@ class Resource
     unless _.isPlainObject @opts
       throw "Options must be a plain object"
 
-    unless @opts.schema
-      throw "Resource 'schema' required"
+    @opts.schema = {} unless @opts.schema
 
     _.defaults @opts, _.cloneDeep @defaults
 

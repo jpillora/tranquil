@@ -42,6 +42,9 @@ class Rest
   addValidators: (validators) ->
     _.extend @validators, validators
 
+  getResource: (name) ->
+    @resources[name]
+
   configure: ->
     console.log "Express Configure"
     @app.use express.logger("dev")
