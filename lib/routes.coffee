@@ -22,42 +22,81 @@ class Routes
     @routeAll()
 
   routeAll: ->
-
-    @app.all "#{@url}/*", (req, res, next) =>
-      @resource.log "middleware!"
-      debugger
-      next()
+    # @app.all "#{@url}/*", (req, res, next) =>
+    #   @resource.log "middleware!"
+    #   next()
 
     #CREATE
-    @app.post @url,    @create
-    #READ (ALL)
-    @app.get @url,     @index
-    #READ (ONE)
-    @app.get @url+@id, @show
+    @routeOne 'create', @url
+    #READ (optional id)   
+    @routeOne 'read' ,  @url+"\/?(:#{@name})?"
     #UPDATE
-    @app.put @url+@id, @update
+    @routeOne 'update', @url+@id
     #DELETE
-    @app.del @url+@id, @delete
+    @routeOne 'delete', @url+@id
 
-  index: (req, res) ->
-    query = {}
-    @Model.find @addParentField(req), @json(res)
+  routeOne: (verb, path) ->
+
+    access = @resource.getAccess verb
+    
+    #access false is disabled
+    return if access is false
+
+    method = @resource.opts.crudMap[verb]
+    unless method
+      @resource.error "Missing verb: #{verb}"
+
+    fn = @[verb]
+    unless fn
+      @resource.error "Missing verb function: #{verb}"
+
+
+    middleware = []
+
+    #access true is public 
+    if access isnt true
+      middleware.push @roleChecker(access)
+
+    middleware.push fn
+
+    @app[method.toLowerCase()].apply @app, [path].concat middleware
+
+  roleChecker: (access) ->
+    (req, res, next) =>
+
+      @resource.log "checking roles... access:", access
+
+      unless req.user
+        res.send 401, "Unauthorized" 
+        return
+
+      @resource.log "success"
+      next()
+
+  read: (req, res) ->
+    if req.params[@name]
+      @resource.log "found id #{req.params[@name]}"
+      @Model.findOne @addIdField(req), @json(res)
+    else
+      @Model.find @addParentField(req), @json(res)
 
   create: (req, res) ->
-    props = @extractFields true, req
-    props = @addParentField req, query
-    props.createdAt = new Date() if @tranq.opts.timestamps
-    props
+    props = @extractFields req
+    props = @addParentField req, props
+
+    if @tranq.UserResource and req.user
+      props.createdBy = req.user
+
+    @resource.log 'create', props
+
     m = new @Model props
     m.save @json(res)
 
-  show: (req, res) ->
-    @Model.findOne @addIdField(req), @json(res)
 
   update: (req, res) ->
     query = @addIdField(req)
     @Model.findOne query, @json(res, (doc) =>
-      _.extend doc, @extractFields(false, req)
+      _.extend doc, @extractFields(req)
       doc.save @json(res)
     )
 
@@ -71,7 +110,7 @@ class Routes
   #REQUEST HELPERS
   
   #extract schema fields from request
-  extractFields: (isNew, req) ->
+  extractFields: (req) ->
     fields = {}
 
     if @resource.opts.schemaOpts.strict
@@ -80,24 +119,21 @@ class Routes
     else
       fields = req.body
 
-    if isNew and @tranq.hasUser and req.user
-      fields.createdBy = req.user
-
     fields
 
   #build a query that identifies the object
   #specified in the request
-  addIdField: (req, query = {}) ->
-    query[@idField] = req.params[@name]
-    @addParentField req, query
+  addIdField: (req, fields = {}) ->
+    fields[@idField] = req.params[@name]
+    @addParentField req, fields
 
   #build a query that identifies the object
   #specified in the request
-  addParentField: (req, query = {}) ->
+  addParentField: (req, fields = {}) ->
     if @parent
       name = @parent.resource.routeName
       query[@parentField] = req.params[name]
-    query
+    fields
 
   #callback function generator
   json: (res, success)->

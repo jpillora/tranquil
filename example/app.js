@@ -62,11 +62,6 @@ server.addValidators({
 
 server.addUserResource({
   name: 'User',
-  roles: {
-    'admin': 3,
-    'user': 2,
-    'guest': 1
-  },
   schema: {
     a: {
       type: String,

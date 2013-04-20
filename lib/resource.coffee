@@ -2,8 +2,10 @@
 _ = require 'lodash'
 mongoose = require 'mongoose'
 require './schema-extend'
-userify = require './userify'
-timestampify = require './timestampify'
+
+userify = require './mixins/userify'
+timestampify = require './mixins/timestampify'
+
 Routes = require './routes'
 
 #plugin variabless
@@ -11,46 +13,54 @@ unimplemented = (req, res) -> res.status 501
 
 #define
 class Resource
-  
-  defaults:
-    idField: '_id'
-    schemaOpts:
-      strict: true
-    middleware: {}
 
   #ENTRY
   constructor: (@name, @opts = {}, @tranq) ->
 
+    @log "constructing"
     _.bindAll @
 
     unless _.isPlainObject @opts
       @error "Options must be a plain object"
 
-    _.defaults @opts, _.cloneDeep @defaults
+    #lazy schema on non-user objs
+    if not @opts.schema and @opts.isUser is `undefined`
+      @opts.schemaOpts = {} unless @opts.schemaOpts
 
-    #no schema
-    unless @opts.schema
-      #auto lazy schema on non-user objs
-      unless @opts.isUser
-        @opts.schemaOpts.strict = false
-      @opts.schema = {}
+      @opts.schemaOpts.strict = false
+
+    #apply defaults
+    _.defaults @opts, _.cloneDeep @tranq.defaults.resource
+
+    @log "strict mode", @opts.schemaOpts.strict
+
+    #this is user resource
+    @tranq.UserResource = @ if @opts.isUser
 
     @routeName = @name.toLowerCase()
     @children = {}
 
-  initialize: ->
-    @checkOpts()
+  check: ->
+    @applyMixins()
     @checkSchema()
+    @log "checked"
+
+  bind: ->
     @defineSchema()
     @defineSchemaMiddleware()
     @defineRoute()
-    @log "ready"
+    @log "bound"
     
   #CONFIG
-  checkOpts: ->
-    if @opts.isUser
-      userify @
-      @tranq.UserResource = @
+  applyMixins: ->
+    
+    #add user data
+    if @ is @tranq.UserResource
+      userify.user @
+
+    #add created by
+    if @tranq.UserResource
+      userify.createdBy @
 
     if @tranq.opts.timestamps
       timestampify @
@@ -59,35 +69,40 @@ class Resource
   checkSchema: ->
 
     #extract children
-    for key, val of @opts.schema
+    for key, type of @opts.schema
+
+      parent = @opts.schema
+      #nested in 'type' check
+      if _.isPlainObject(type) and type.type
+        type = type.type
+        parent = parent[key]
 
       #array check
-      isArray = _.isArray(val) and val.length is 1
-      val = val[0] if isArray
+      isArray = _.isArray(type) and type.length is 1
+      type = type[0] if isArray
 
       #link resource
-      if typeof val is 'string'
-        other = @tranq.resources[val]
-        if other and other.Schema
-          @linkResource isArray, key, other
+      if typeof type is 'string'
+        other = @tranq.resources[type]
+
+        #listed schema must exist
+        unless other and other.Schema
+          @error "could NOT find: #{type}"
+
+        #convert string to objectid and store ref.
+        if isArray
+          parent[key] = [mongoose.Schema.ObjectId]
+          @children[key] = other
         else
-          @error "could NOT find: #{val}"
-      
-      if _.isPlainObject(val) and _.isArray(val.validate)
-        val.validate = _.map val.validate, (str) =>
+          parent[key] = mongoose.Schema.ObjectId
+
+      #map across validator functions
+      if _.isPlainObject(type) and _.isArray(type.validate)
+        type.validate = _.map type.validate, (str) =>
           return str if typeof str isnt 'string'
           validator = @tranq.validators[str]
           @error "Missing validator: #{str}" unless validator
           return validator
-
-  linkResource: (isArray, field, other) ->
-    #single
-    unless isArray
-      @opts.schema[field] = mongoose.Schema.ObjectId
-      return
-    #array
-    @opts.schema[field] = [mongoose.Schema.ObjectId]
-    @children[field] = other
 
   defineSchema: ->
 
@@ -124,23 +139,42 @@ class Resource
           set time, type, fns
     null
 
+  getAccess: (verb) ->
+
+    char = verb.charAt 0
+
+    if _.isPlainObject @opts.access
+      for key, value of @opts.access
+        if char is key.charAt(0)
+          return value
+
+    t = typeof @opts.access
+    if t isnt 'string' and t isnt 'boolean'
+      @error "Invalid access type: #{t}"
+
+    @opts.access
+
   #ROUTES
   defineRoute: (parent) ->
+
+    if @opts.isUser
+      userify.routes @tranq
+
     #define this resource's routes
     routes = new Routes @, parent    
     #define child routes ontop
     for n, child of @children
       child.defineRoute routes
 
+  #helpers
   log: ->
     a = Array.prototype.slice.call arguments
     a.unshift @.toString()
     console.log.apply console, a
 
   error: (s) ->
-    throw "#{@} #{s}"
+    throw new Error @.toString() + " " + s
 
-  #helpers
   toString: ->
     "Resource: #{@name}:"
 

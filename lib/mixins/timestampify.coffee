@@ -1,4 +1,4 @@
-util = require "./util"
+util = require "../util"
 
 module.exports = (resource) ->
 
@@ -18,7 +18,7 @@ module.exports = (resource) ->
     middleware:
       pre:
         validate: (next) -> 
-          @updatedAt = new Date()
+          @updatedAt = @createdAt = new Date()
           next()
         
   }
