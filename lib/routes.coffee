@@ -45,13 +45,25 @@ class Routes
 
     middleware = []
 
+    @routeMiddleware 'pre', verb, middleware
+
     #access true is public 
     if access isnt true
       middleware.push @roleChecker(access)
 
     middleware.push fn
 
+    @routeMiddleware 'post', verb, middleware
+
     @app[method.toLowerCase()].apply @app, [path].concat middleware
+
+  routeMiddleware: (time, verb, middleware) ->
+
+    ms = @resource.opts.routeMiddleware?[time]?[verb]
+    return unless ms
+    for m in ms
+      @resource.log "route middleware:", time, verb
+      middleware.push m
 
   roleChecker: (access) ->
     (req, res, next) =>
@@ -65,39 +77,38 @@ class Routes
       @resource.log "success"
       next()
 
-  read: (req, res) ->
+  read: (req, res, next) ->
     if req.params[@name]
       @resource.log "found id #{req.params[@name]}"
-      @Model.findOne @addIdField(req), @json(res)
+      @Model.findOne @addIdField(req), @handle(res, next)
     else
-      @Model.find @addParentField(req), @json(res)
+      @Model.find @addParentField(req), @handle(res, next)
 
-  create: (req, res) ->
+  create: (req, res, next) ->
     props = @extractFields req
     props = @addParentField req, props
 
     if @tranq.UserResource and req.user
       props.createdBy = req.user
 
-    @resource.log 'create', props
-
     m = new @Model props
-    m.save @json(res)
+    m.save @handle(res, next)
 
-
-  update: (req, res) ->
+  update: (req, res, next) ->
     query = @addIdField(req)
-    @Model.findOne query, @json(res, (doc) =>
-      _.extend doc, @extractFields(req)
-      doc.save @json(res)
+    @Model.findOne query, @handle(res, next,
+      (doc) =>
+        _.extend doc, @extractFields(req)
+        doc.save @handle(res, next)
     )
 
-  delete: (req, res) ->
-    @Model.findOne @addIdField(req), @json(res, (doc) =>
-      doc.remove @json(res)
+  delete: (req, res, next) ->
+    @Model.findOne @addIdField(req), @handle(res, next,
+      (doc) =>
+        doc.remove @handle(res, next)
     )
   # new: (req, res) ->
-  #   @json(res)(null, _.keys(@Schema.paths))
+  #   @handle(res)(null, _.keys(@Schema.paths))
 
   #REQUEST HELPERS
   
@@ -120,15 +131,16 @@ class Routes
     fields
 
   #callback function generator
-  json: (res, success)->
+  handle: (res, next, success)->
     (err, doc) ->
       if err
-        res.send 400, { error: err }
+        next new Error { status: 400, error: err }
       else if doc is null
-        res.send 404, "Not Found"
+        next new Error { status: 404, error: "Not Found" }
       else if typeof success is 'function'
         success doc
       else 
-        res.json doc
+        res.doc = doc
+        next()
 
 module.exports = Routes

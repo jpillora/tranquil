@@ -16,8 +16,8 @@ module.exports = (resource) ->
     databaseMiddleware:
       pre:
         validate: (next) ->
-          #@createdAt = 
           @updatedAt = new Date()
+          @createdAt = @updatedAt unless @createdAt
           next()
         
   }

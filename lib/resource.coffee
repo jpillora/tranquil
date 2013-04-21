@@ -29,7 +29,10 @@ class Resource
       opts.schemaOpts.strict = false
 
     #apply defaults
-    @opts = util.mixin {}, @tranq.defaults.resource, opts
+    @opts = util.mixin {}, @tranq.opts.resource, opts
+
+    # @log "inspecting..."
+    # @log @opts
 
     #this is user resource
     if @opts.isUser
@@ -49,6 +52,7 @@ class Resource
     
   #CONFIG
   applyMixins: ->
+
     for name in @opts.mixins
       @log "mixin:", name
       mixin = @tranq.getMixin name
@@ -147,7 +151,6 @@ class Resource
 
   #ROUTES
   defineRoute: (parent) ->
-
     #define this resource's routes
     routes = new Routes @, parent    
     #define child routes ontop

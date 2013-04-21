@@ -2,7 +2,7 @@
 Resource = require "./resource"
 db = require "./db"
 util = require "./util"
-u = require("util")
+handlers = require "./handlers"
 _ = require "lodash"
 express = require "express"
 methods = require "methods"
@@ -32,7 +32,8 @@ class Tranquil
       cookieParser: express.cookieParser("s3cr3t")
       session: express.session()
       router: null#auto-generated
-
+      docHandler: handlers.doc
+      # errHandler: handlers.err
     #resource defaults
     resource:
       idField: '_id'
@@ -61,8 +62,7 @@ class Tranquil
 
     @opts = util.mixin {}, @defaults, opts
 
-    @log "inspecting..."
-    @log @opts
+    # @log @opts
 
     @app = express()
 
@@ -79,6 +79,7 @@ class Tranquil
       @log "Connected to MongoDB (#{@opts.database.name})"
 
     @mixins = requireDir "./mixins"
+
     @resources = {}
     @validators = {}
 
