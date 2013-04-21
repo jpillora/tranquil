@@ -26,13 +26,15 @@
   "dependencies": {
     "mongoose": "~3.6.2",
     "coffee-script": "~1.6.2",
-    "lodash": "~1.1.1",
+    "lodash": "1.2.0",
     "password-hash": "~1.2.1",
     "passport-local": "~0.1.6",
     "passport": "~0.1.16",
     "inflection": "~1.2.5",
     "express": "~3.1.1",
     "validate": "~0.2.3",
-    "methods": "0.0.1"
+    "methods": "0.0.1",
+    "filtrate": "0.0.2",
+    "require-dir": "~0.1.0"
   }
 }

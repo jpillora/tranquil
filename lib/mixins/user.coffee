@@ -4,7 +4,14 @@ mongoose = require("mongoose")
 LocalStrategy = require("passport-local").Strategy
 passwordHash = require('password-hash')
 
-setupPassport = (resource) ->
+mixedWith = null
+
+#public interface
+module.exports = (resource) ->
+  if mixedWith
+    resource.error "already mixed with: #{mixedWith.name}"
+
+  mixedWith = resource
 
   #configure passport
   #user -> cookie
@@ -29,7 +36,24 @@ setupPassport = (resource) ->
 
   passport.use new LocalStrategy verify
 
-mixinUserSchema = (resource) ->
+
+  #add auth routes
+  tranq = resource.tranq
+  app = tranq.app
+
+  url = tranq.opts.baseUrl + '/auth'
+
+  app.post "#{url}/login", passport.authenticate('local'), (req, res) ->
+    res.json {result: 'success', user: req.user}
+
+  app.get "#{url}/logout", (req, res) ->
+    req.logout()
+    res.send 'logout'
+
+  app.get "#{url}/user", (req, res) ->
+    res.json has_user: if req.user then req.user else null
+
+  resource.log "Added auth routes"
 
   #add user into into schema
   util.mixin resource.opts, {
@@ -46,7 +70,7 @@ mixinUserSchema = (resource) ->
       roles:
         type: [String]
     
-    middleware:
+    databaseMiddleware:
       pre:
         #hash password on the way in
         save: [
@@ -54,50 +78,16 @@ mixinUserSchema = (resource) ->
             @password = passwordHash.generate @password if @password
             next()
         ]
-    express:
-      use: [
-        passport.initialize()
-        passport.session()
-      ]
-
-  }
-
-
-bindRoutes = (resource, app, tranq) ->
-  url = tranq.opts.baseUrl + '/auth'
-
-  app.post "#{url}/login", passport.authenticate('local'), (req, res) ->
-    res.json {result: 'success', user: req.user}
-
-  app.get "#{url}/logout", (req, res) ->
-    req.logout()
-    res.send 'logout'
-
-  app.get "#{url}/user", (req, res) ->
-    res.json has_user: if req.user then req.user else null
-
-  tranq.log "Bound auth routes"
-
-mixinCreatedBy = (resource) ->
   
-  util.mixin resource.opts, {
-    schema:
-      createdBy:
-        type: mongoose.Schema.ObjectId
+    expressMiddleware: 
+      pre:
+        router:
+          ppInit: passport.initialize()
+          ppSess: passport.session()
+        
   }
 
-#public interface
-module.exports =
 
-  createdBy: (resource) ->
-    resource.log "createdbyify!"
-    mixinCreatedBy(resource)
 
-  user: (resource) ->
-    resource.log "userify!"
-    setupPassport(resource)
-    mixinUserSchema(resource)
-
-  routes: bindRoutes
 
 

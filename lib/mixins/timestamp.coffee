@@ -2,8 +2,6 @@ util = require "../util"
 
 module.exports = (resource) ->
 
-  resource.log "timestampify!"
-
   #add user into into schema
   util.mixin resource.opts, {
     schema:
@@ -15,10 +13,11 @@ module.exports = (resource) ->
         type: Date
         required: true
     
-    middleware:
+    databaseMiddleware:
       pre:
-        validate: (next) -> 
-          @updatedAt = @createdAt = new Date()
+        validate: (next) ->
+          #@createdAt = 
+          @updatedAt = new Date()
           next()
         
   }

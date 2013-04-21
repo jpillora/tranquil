@@ -1,22 +1,39 @@
 
 Resource = require "./resource"
 db = require "./db"
+util = require "./util"
+u = require("util")
 _ = require "lodash"
 express = require "express"
 methods = require "methods"
+filtrate = require "filtrate"
+requireDir = require "require-dir"
 
 guid = -> (Math.random()*Math.pow(2,32)).toString(16)
 
 class Tranquil
 
   defaults:
+    #base url
     baseUrl: ''
+    #admin user
     admin:
       username: "admin"
       password: guid()+guid()
+    #mongoose
     database:
       name: "tranquil"
       host: "localhost"
+    #express middleware order
+    use:
+      logger: express.logger("dev")
+      compress: express.compress()
+      bodyParser: express.bodyParser()
+      cookieParser: express.cookieParser("s3cr3t")
+      session: express.session()
+      router: null#auto-generated
+
+    #resource defaults
     resource:
       idField: '_id'
       access: 'admin'
@@ -25,34 +42,43 @@ class Tranquil
         read: 'GET'
         update: 'PUT'
         'delete': 'DELETE'
+      mixins: []
       schema: {}
       schemaOpts:
         strict: true
-      middleware: {}
-      express: {}
+      databaseMiddleware: {}
+      expressMiddleware: {}
+      routeMiddleware: {}
+    #rate limiting
     rateLimit:
       mode: 'ip' #or 'session'
       num:  1
       per: 1000
 
-  constructor: (@opts) ->
+  constructor: (opts) ->
+
     _.bindAll @
-    _.defaults @opts, @defaults
+
+    @opts = util.mixin {}, @defaults, opts
+
+    @log "inspecting..."
+    @log @opts
 
     @app = express()
 
+    #intercept all route definitions
     @expressRoutes = {}
     methods.concat(['all']).forEach (n) =>
       @expressRoutes[n] =
-        fn:@app[n]
+        fn: @app[n]
         calls: []
-      @app[n] = => 
+      @app[n] = =>
         @expressRoutes[n].calls.push arguments
 
     @db = db.makeDatabase @opts.database, =>
       @log "Connected to MongoDB (#{@opts.database.name})"
-      @dbReady = true
 
+    @mixins = requireDir "./mixins"
     @resources = {}
     @validators = {}
 
@@ -73,7 +99,46 @@ class Tranquil
     _.extend @validators, validators
 
   getResource: (name) ->
-    @resources[name]
+    @resources[name] or @error "Missing resource: #{name}"
+
+  addMixin: (name, fn) ->
+    @mixins[name] = fn
+
+  getMixin: (name) ->
+    @mixins[name] or @error "Missing mixin: #{name}"
+
+  # find all middleware defined in all resources
+  # combine them into a multiple arrays
+  _findMiddleware: ->
+    m = {}
+
+    parseExpress = (exp) ->
+      for t, tObj of exp
+        #add 'pre' 'post'
+        m[t] = {} unless m[t]
+        for name, def of tObj
+          m[t][name] = [] unless m[t][name]
+          addDef m[t][name], def
+
+    addDef = (array, def) ->
+      if _.isArray def
+        for fn in def
+          array.push { fn } 
+      else if _.isPlainObject def
+        for name, fn of def
+          array.push { name, fn }
+      else if _.isFunction def
+        array.push { fn }
+      else
+        throw "unknown type"
+
+    #run
+    for name, resource of @resources
+      exp = resource.opts.expressMiddleware
+      continue unless _.isPlainObject exp
+      parseExpress exp, m
+
+    return m
 
   listen: (port) ->
 
@@ -88,26 +153,30 @@ class Tranquil
     @log "initialized all resources"
 
     #configure express
-    @app.configure =>
+    @app.configure => 
       @log "Express Configure"
-      @app.use express.logger("dev")
-      @app.use express.compress()
-      @app.use express.bodyParser()
-      @app.use express.methodOverride()
-      @app.use express.cookieParser "s3cret"
-      @app.use express.session()
 
-      #plugins
-      for name, resource of @resources
-        express = resource.opts.express
-        if express and _.isArray express.use
-          resource.log "bind express plugins (#{express.use.length})"
-          for plugin in express.use
-            @app.use plugin
+      userMw = @_findMiddleware()
 
-      @app.use @app.router
+      defineT = (time, name) =>
+        return unless name
+        objs = userMw[time]?[name]
+        return unless objs
+        for obj in objs
+          define(obj.name, obj.fn)
 
-    #run accumulated express routes
+      define = (name, mw) =>
+        defineT 'pre', name
+        mw = @app.router if name is 'router'
+        @log 'use middleware', name
+        @app.use mw
+        defineT 'post', name
+
+      #recurrsive define middleware
+      for name, mw of @opts.use
+        define name, mw
+
+    #apply accumulated express routes
     for name, route of @expressRoutes
       continue if route.calls.length is 0
       @log 'bind', route.calls.length, name, 'handlers'
@@ -133,10 +202,11 @@ class Tranquil
       roles: ['admin']
     }
 
+    @log "Creating admin user: #{JSON.stringify(props)}" 
+
     user = new @UserResource.Model props
     user.save (err, doc) =>
       @error err if err
-      @log "Admin user created: #{JSON.stringify(props)}"
 
   #helpers
   log: ->

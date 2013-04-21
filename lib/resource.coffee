@@ -3,10 +3,9 @@ _ = require 'lodash'
 mongoose = require 'mongoose'
 require './schema-extend'
 
-userify = require './mixins/userify'
-timestampify = require './mixins/timestampify'
 
 Routes = require './routes'
+util = require './util'
 
 #plugin variabless
 unimplemented = (req, res) -> res.status 501
@@ -20,20 +19,22 @@ class Resource
     @log "added"
     _.bindAll @
 
-    unless _.isPlainObject @opts
+    unless _.isPlainObject opts
       @error "Options must be a plain object"
 
     #lazy schema on non-user objs
-    if not @opts.schema and @opts.isUser is `undefined`
-      @opts.schemaOpts = {} unless @opts.schemaOpts
+    if not opts.schema and opts.isUser is `undefined`
+      opts.schemaOpts = {} unless opts.schemaOpts
       @log "strict mode OFF"
-      @opts.schemaOpts.strict = false
+      opts.schemaOpts.strict = false
 
     #apply defaults
-    _.defaults @opts, _.cloneDeep @tranq.defaults.resource
+    @opts = util.mixin {}, @tranq.defaults.resource, opts
 
     #this is user resource
-    @tranq.UserResource = @ if @opts.isUser
+    if @opts.isUser
+      @tranq.UserResource = @
+      @opts.mixins.push 'user'
 
     @routeName = @name.toLowerCase()
     @children = {}
@@ -42,23 +43,16 @@ class Resource
     @applyMixins()
     @linkSchema()
     @defineSchema()
-    @defineSchemaMiddleware()
+    @defineDatabaseMiddleware()
     @defineRoute()
     @log "initialized"
     
   #CONFIG
   applyMixins: ->
-    
-    #add user data
-    if @ is @tranq.UserResource
-      userify.user @
-
-    #add created by
-    if @tranq.UserResource
-      userify.createdBy @
-
-    if @opts.timestamps
-      timestampify @
+    for name in @opts.mixins
+      @log "mixin:", name
+      mixin = @tranq.getMixin name
+      mixin @
 
   #SCHEMA
   linkSchema: ->
@@ -114,16 +108,16 @@ class Resource
     #back ref
     @Schema.resource = @
 
-  defineSchemaMiddleware: ->
+  defineDatabaseMiddleware: ->
     set = (time, type, fn) =>
       if _.isFunction fn
         @Schema[time](type, fn)
-        @log "middleware: #{time} #{type}"
+        @log "db middleware: #{time} #{type}"
       else
         @log fn
         @error "Invalid middleware #{time} #{type}"
     
-    middleware = @opts.middleware
+    middleware = @opts.databaseMiddleware
 
     for time, types of middleware
       for type, fns of types
@@ -153,9 +147,6 @@ class Resource
 
   #ROUTES
   defineRoute: (parent) ->
-
-    if not parent and @opts.isUser
-      userify.routes @, @tranq.app, @tranq
 
     #define this resource's routes
     routes = new Routes @, parent    
