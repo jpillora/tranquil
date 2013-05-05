@@ -134,11 +134,12 @@ class Resource
 
   getAccess: (verb) ->
 
-    char = verb.charAt 0
+    v = verb.charAt 0
 
     if _.isPlainObject @opts.access
       for key, value of @opts.access
-        if char is key.charAt(0)
+        k = key.charAt(0)
+        if k is v or (k is 'w' and v in ['c','u','d'])
           return value
       #not defined
       return false

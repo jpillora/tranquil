@@ -6,7 +6,6 @@ handlers = require "./handlers"
 _ = require "lodash"
 express = require "express"
 methods = require "methods"
-filtrate = require "filtrate"
 requireDir = require "require-dir"
 
 guid = -> (Math.random()*Math.pow(2,32)).toString(16)
