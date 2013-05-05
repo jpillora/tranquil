@@ -1,6 +1,6 @@
 {
   "name": "tranquil",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Generate powerful RESTful JSON APIs",
   "main": "index.js",
   "scripts": {

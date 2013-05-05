@@ -5,4 +5,4 @@ module.exports =
 
   err: (err, req, res, next) ->
     return next() unless err
-    res.send 400, err
+    res.send err.status, err.error

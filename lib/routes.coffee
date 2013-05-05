@@ -21,7 +21,7 @@ class Routes
 
     #CREATE
     @route 'create', @url
-    #READ (optional id)   
+    #READ (optional id)
     @route 'read' ,  @url+"\/?(:#{@name})?"
     #UPDATE
     @route 'update', @url+@id
@@ -31,7 +31,7 @@ class Routes
   route: (verb, path) ->
 
     access = @resource.getAccess verb
-    
+
     #access false is disabled
     return if access is false
 
@@ -47,7 +47,7 @@ class Routes
 
     @routeMiddleware 'pre', verb, middleware
 
-    #access true is public 
+    #access true is public
     if access isnt true
       middleware.push @roleChecker(access)
 
@@ -71,7 +71,7 @@ class Routes
       @resource.log "checking roles... access:", access
 
       unless req.user
-        res.send 401, "Unauthorized" 
+        res.send 401, "Unauthorized"
         return
 
       @resource.log "success"
@@ -111,7 +111,7 @@ class Routes
   #   @handle(res)(null, _.keys(@Schema.paths))
 
   #REQUEST HELPERS
-  
+
   #extract schema fields from request
   extractFields: (req) ->
     req.body
@@ -134,12 +134,12 @@ class Routes
   handle: (res, next, success)->
     (err, doc) ->
       if err
-        next new Error { status: 400, error: err }
+        next { status: 400, error: err }
       else if doc is null
-        next new Error { status: 404, error: "Not Found" }
+        next { status: 404, error: "Not Found" }
       else if typeof success is 'function'
         success doc
-      else 
+      else
         res.doc = doc
         next()
 

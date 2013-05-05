@@ -33,7 +33,7 @@ class Tranquil
       session: express.session()
       router: null#auto-generated
       docHandler: handlers.doc
-      # errHandler: handlers.err
+      errHandler: handlers.err
     #resource defaults
     resource:
       idField: '_id'
@@ -93,7 +93,7 @@ class Tranquil
   addResource: (opts) ->
     name = opts.name
     @error "Resource 'name' required" unless name
-    @error "Resource '#{name}' already exists" if @resources[name] 
+    @error "Resource '#{name}' already exists" if @resources[name]
     @resources[name] = new Resource name, opts, @
 
   addValidators: (validators) ->
@@ -124,7 +124,7 @@ class Tranquil
     addDef = (array, def) ->
       if _.isArray def
         for fn in def
-          array.push { fn } 
+          array.push { fn }
       else if _.isPlainObject def
         for name, fn of def
           array.push { name, fn }
@@ -154,7 +154,7 @@ class Tranquil
     @log "initialized all resources"
 
     #configure express
-    @app.configure => 
+    @app.configure =>
       @log "Express Configure"
 
       userMw = @_findMiddleware()
@@ -191,7 +191,7 @@ class Tranquil
 
     #finally listen
     @app.listen port
-    
+
     @log "Listening on: #{port}"
 
   #admin user must be created
@@ -203,7 +203,7 @@ class Tranquil
       roles: ['admin']
     }
 
-    @log "Creating admin user: #{JSON.stringify(props)}" 
+    @log "Creating admin user: #{JSON.stringify(props)}"
 
     user = new @UserResource.Model props
     user.save (err, doc) =>
