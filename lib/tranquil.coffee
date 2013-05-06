@@ -1,14 +1,17 @@
 
 Resource = require "./resource"
 db = require "./db"
+rateLimit = require "./extensions/ratelimit"
 util = require "./util"
-handlers = require "./handlers"
 _ = require "lodash"
 express = require "express"
 methods = require "methods"
 requireDir = require "require-dir"
 
 guid = -> (Math.random()*Math.pow(2,32)).toString(16)
+
+Type =
+  ROUTER: 42
 
 class Tranquil
 
@@ -23,31 +26,31 @@ class Tranquil
     database:
       name: "tranquil"
       host: "localhost"
-    #express middleware order
-    use:
-      logger: express.logger("dev")
-      compress: express.compress()
-      bodyParser: express.bodyParser()
-      cookieParser: express.cookieParser("s3cr3t")
-      session: express.session()
-      router: null#auto-generated
-      docHandler: handlers.doc
-      errHandler: handlers.err
+    #express options
+    expressCoreMiddlware:
+      logger: 'dev'
+      compress: true
+      bodyParser: true
+      cookieParser: "s3cr3t"
+      session: true
     #resource defaults
     resource:
       idField: '_id'
       access: 'admin'
       crudMap:
-        create: 'POST'
-        read: 'GET'
-        update: 'PUT'
+        'create': 'POST'
+        'read'  : 'GET'
+        'update': 'PUT'
         'delete': 'DELETE'
       mixins: []
       schema: {}
       schemaOpts:
         strict: true
+      #add mongoose middleware to this resource's schema
       databaseMiddleware: {}
+      #insert express middleware into the server middleware stack
       expressMiddleware: {}
+      #insert express route into the resources CRUD endpoints
       routeMiddleware: {}
     #rate limiting
     rateLimit:
@@ -58,36 +61,52 @@ class Tranquil
   constructor: (opts) ->
 
     _.bindAll @
-
     @opts = util.mixin {}, @defaults, opts
-
-    # @log @opts
-
-    @app = express()
-
-    #intercept all route definitions
-    @expressRoutes = {}
-    methods.concat(['all']).forEach (n) =>
-      @expressRoutes[n] =
-        fn: @app[n]
-        calls: []
-      @app[n] = =>
-        @expressRoutes[n].calls.push arguments
 
     @db = db.makeDatabase @opts.database, =>
       @log "Connected to MongoDB (#{@opts.database.name})"
 
     @mixins = requireDir "./mixins"
-
     @resources = {}
     @validators = {}
+
+    @initExpress()
+
+  initExpress: ->
+    #create app
+    @app = express()
+
+    #set initial express middlware
+    preRouter = {}
+    for name, arg of @opts.expressCoreMiddlware
+      continue if arg is false or not express[name]
+      args = []
+      args.push arg if arg isnt true
+      preRouter[name] = express[name].apply express, args
+
+    postRouter = {}
+    postRouter.tranqDoc = @handleDoc
+    postRouter.tranqErr = @handleError
+
+    @expressMiddleware =
+      pre:  { router: preRouter  }
+      post: { router: postRouter }
+
+    #intercept all route definitions
+    @expressRoutes = {}
+    methods.concat('all').forEach (method) =>
+      @expressRoutes[method] =
+        fn: @app[method]
+        calls: []
+      @app[method] = =>
+        @expressRoutes[method].calls.push arguments
 
   #API
   addUserResource: (opts) ->
     if @UserResource
       @error "only 1 user resource is allowed"
     opts.isUser = true
-    @addResource opts
+    @UserResource = @addResource opts
 
   addResource: (opts) ->
     name = opts.name
@@ -95,20 +114,21 @@ class Tranquil
     @error "Resource '#{name}' already exists" if @resources[name]
     @resources[name] = new Resource name, opts, @
 
-  addValidators: (validators) ->
-    _.extend @validators, validators
-
   getResource: (name) ->
     @resources[name] or @error "Missing resource: #{name}"
+
+  addValidators: (validators) ->
+    _.extend @validators, validators
 
   addMixin: (name, fn) ->
     @mixins[name] = fn
 
-  getMixin: (name) ->
-    @mixins[name] or @error "Missing mixin: #{name}"
+  #inserts middleware into the options object
+  addExpressMiddleware: (obj) ->
+    util.mixin @expressMiddleware, obj
 
   # find all middleware defined in all resources
-  # combine them into a multiple arrays
+  # combine them into a map of arrays
   _findMiddleware: ->
     m = {}
 
@@ -132,13 +152,77 @@ class Tranquil
       else
         throw "unknown type"
 
-    #run
+    #extract from tranqil
+    parseExpress @expressMiddleware
+    #extract from resources
     for name, resource of @resources
       exp = resource.opts.expressMiddleware
       continue unless _.isPlainObject exp
-      parseExpress exp, m
+      parseExpress exp
 
     return m
+
+  #root
+  listResources: ->
+
+    list = {}
+    for name, resource of @resources
+      list[name] =
+        url: resource.routes.url
+        access: resource.opts.access
+        schema: _.keys resource.Schema.paths
+
+    @app.get @opts.baseUrl, (req, res) ->
+      res.json list
+
+  handleDoc: (req, res, next) ->
+    return next() unless res.doc
+    res.send 200, res.doc
+
+  handleError: (err, req, res, next) ->
+    return next() unless err
+
+    if _.isPlainObject err
+      error = err.error
+      status = err.status
+    else
+      error = err
+      status = 400
+
+    res.send status, error
+
+  configure: ->
+    @log "Express Configure"
+
+    listMw = []
+    userMw = @_findMiddleware()
+
+    defineT = (time, name) =>
+      return unless name
+      objs = userMw[time]?[name]
+      return unless objs
+
+      unless _.isPlainObject objs
+        @error "Invalid middleware:", objs
+      for obj in objs
+        define(obj.name, obj.fn)
+
+    define = (name, mw) =>
+      defineT 'pre', name
+      if _.isFunction mw
+        listMw.push name
+        @app.use mw
+      else
+        console.log name, mw
+        @error "Express Middleware: '#{name}' is not a function"
+      defineT 'post', name
+
+    @log userMw
+
+    #recurrsive define middleware
+    define 'router', @app.router
+
+    @log "use middleware: [#{listMw.join ' > '}]"
 
   listen: (port) ->
 
@@ -152,30 +236,14 @@ class Tranquil
 
     @log "initialized all resources"
 
-    #configure express
-    @app.configure =>
-      @log "Express Configure"
+    #setup rate limiter
+    rateLimit @
 
-      userMw = @_findMiddleware()
+    #configure express - set middleware
+    @app.configure @configure
 
-      defineT = (time, name) =>
-        return unless name
-        objs = userMw[time]?[name]
-        return unless objs
-        for obj in objs
-          define(obj.name, obj.fn)
-
-      define = (name, mw) =>
-        defineT 'pre', name
-        mw = @app.router if name is 'router'
-        @log 'use middleware', name
-        @app.use mw
-        defineT 'post', name
-
-      #recurrsive define middleware
-      for name, mw of @opts.use
-        define name, mw
-
+    #show api
+    @listResources()
     #apply accumulated express routes
     for name, route of @expressRoutes
       continue if route.calls.length is 0
@@ -219,5 +287,7 @@ class Tranquil
 
   toString: ->
     "Tranquil:"
+
+Tranquil.Type = Type
 
 exports.createServer = (opts) -> new Tranquil opts

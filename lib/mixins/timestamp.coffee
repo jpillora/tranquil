@@ -12,12 +12,13 @@ module.exports = (resource) ->
       updatedAt:
         type: Date
         required: true
-    
+
     databaseMiddleware:
       pre:
-        validate: (next) ->
+        validate: [(next) ->
           @updatedAt = new Date()
           @createdAt = @updatedAt unless @createdAt
           next()
-        
+        ]
+
   }

@@ -67,14 +67,10 @@ class Routes
 
   roleChecker: (access) ->
     (req, res, next) =>
-
-      @resource.log "checking roles... access:", access
-
-      unless req.user
+      #guard against unauth access
+      unless req.user and access in req.user.roles
         res.send 401, "Unauthorized"
         return
-
-      @resource.log "success"
       next()
 
   read: (req, res, next) ->
@@ -107,8 +103,6 @@ class Routes
       (doc) =>
         doc.remove @handle(res, next)
     )
-  # new: (req, res) ->
-  #   @handle(res)(null, _.keys(@Schema.paths))
 
   #REQUEST HELPERS
 

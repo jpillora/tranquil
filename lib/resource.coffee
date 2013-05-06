@@ -31,13 +31,8 @@ class Resource
     #apply defaults
     @opts = util.mixin {}, @tranq.opts.resource, opts
 
-    # @log "inspecting..."
-    # @log @opts
-
     #this is user resource
-    if @opts.isUser
-      @tranq.UserResource = @
-      @opts.mixins.push 'user'
+    @opts.mixins.push 'user' if @opts.isUser
 
     @routeName = @name.toLowerCase()
     @children = {}
@@ -49,13 +44,13 @@ class Resource
     @defineDatabaseMiddleware()
     @defineRoute()
     @log "initialized"
-    
+
   #CONFIG
   applyMixins: ->
-
     for name in @opts.mixins
       @log "mixin:", name
-      mixin = @tranq.getMixin name
+      mixin = @tranq.mixins[name]
+      @error "Missing mixin: #{name}" unless mixin
       mixin @
 
   #SCHEMA
@@ -106,7 +101,7 @@ class Resource
       @Schema =  Extend.extend @opts.schema, @opts.schemaOpts
     else
       @Schema = new mongoose.Schema @opts.schema, @opts.schemaOpts
-    
+
     #build mongoose model
     @Model = @tranq.db.model @name, @Schema
     #back ref
@@ -120,7 +115,7 @@ class Resource
       else
         @log fn
         @error "Invalid middleware #{time} #{type}"
-    
+
     middleware = @opts.databaseMiddleware
 
     for time, types of middleware
@@ -153,7 +148,7 @@ class Resource
   #ROUTES
   defineRoute: (parent) ->
     #define this resource's routes
-    routes = new Routes @, parent    
+    @routes = new Routes @, parent
     #define child routes ontop
     for n, child of @children
       child.defineRoute routes

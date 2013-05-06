@@ -16,11 +16,9 @@ module.exports = (resource) ->
   #configure passport
   #user -> cookie
   passport.serializeUser (user, done) ->
-    console.log "serializeUser"
     done null, user.id
   #cookie -> user
   passport.deserializeUser (id, done) ->
-    console.log "deserializeUser"
     resource.Model.findById id, (err, e) ->
       return done err if err
       done null, e
@@ -31,7 +29,7 @@ module.exports = (resource) ->
     resource.Model.findOne { username }, (err, user) ->
       if err or not user
         return done err or null
-      result = passwordHash.verify(passwordAttempt, user.password)
+      result = passwordHash.verify passwordAttempt, user.password
       done(err, if result then user else null)
 
   passport.use new LocalStrategy verify
@@ -42,6 +40,14 @@ module.exports = (resource) ->
   app = tranq.app
 
   url = tranq.opts.baseUrl + '/auth'
+
+  app.get "#{url}/login", (req, res) ->
+    res.send """<form method="post">
+      <p>Current User: #{req.user || 'NO USER'}</p>
+      <input placeholder="username" name="username"/>
+      <input placeholder="password" type="password" name="password"/>
+      <input type="submit"/>
+    </form>"""
 
   app.post "#{url}/login", passport.authenticate('local'), (req, res) ->
     res.json {result: 'success', user: req.user}
@@ -62,14 +68,15 @@ module.exports = (resource) ->
         type: String
         index: true
         required: true
+        unique: true
 
       password:
         type: String
         required: true
-      
+
       roles:
         type: [String]
-    
+
     databaseMiddleware:
       pre:
         #hash password on the way in
@@ -78,13 +85,13 @@ module.exports = (resource) ->
             @password = passwordHash.generate @password if @password
             next()
         ]
-  
-    expressMiddleware: 
+
+    expressMiddleware:
       pre:
         router:
-          ppInit: passport.initialize()
-          ppSess: passport.session()
-        
+          passportInit: passport.initialize()
+          passportSess: passport.session()
+
   }
 
 
