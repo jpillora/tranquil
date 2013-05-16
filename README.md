@@ -18,7 +18,9 @@ Create a Tranquil server
 var tranquil = require("tranquil");
 
 var server = tranquil.createServer({
-  baseUrl: '/api'
+  baseUrl: '/api',
+  //default access
+  access: 'admin'
 });
 ```
 *Note: See all server options below*
@@ -47,6 +49,7 @@ server.addResource({
     owner: 'User'
   },
 
+  //custom access definition
   access: {
     c: 'admin',
     r: true,
@@ -87,13 +90,21 @@ server.addUserResource({
     }
   }
 });
-*Note: UserResources will mixin user specific fields. See below for mixins.
-
-
-Finally, start the server on port `1337`
-``` javascript
-server.listen(1337);
 ```
+*Note: UserResources will mixin user specific fields. See below for mixins.*
+
+
+Finally, start the server on port `3000`
+
+``` javascript
+server.listen(3000);
+```
+
+Now you have CRUD access to the RESTful endpoints:
+
+* The Report Resource on `/api/report`
+* The Company Resource on `/api/company`
+* The User Resource on `/api/user`
 
 ### API
 
@@ -117,10 +128,13 @@ Adds a RESTful resource to the server instance
 
 **expressMiddleware**: Express middleware definitions.
 
-##### `server`.`addUserResource`(`options`)
+#### `server`.`addUserResource`(`options`)
 
 ...
 
+#### `server`.`addMixin`(`mixin`)
 
+##### `mixin`
 
+Mixins are small `options` objects which contains partial configuration that can be **mixed in** to other `options` objects.
 
